@@ -24,13 +24,13 @@
 #include <cstddef>
 
 struct gridfs_options {
-  const char* host;
+  const char *host;
   int port;
   mongo::ConnectionString *conn_string;
-  const char* db;
-  const char* prefix;
-  const char* username;
-  const char* password;
+  const char *db;
+  const char *prefix;
+  const char *username;
+  const char *password;
 };
 
 extern gridfs_options gridfs_options;
@@ -44,11 +44,13 @@ enum {
 
 extern struct fuse_opt gridfs_opts[];
 
-int gridfs_opt_proc(void* data, const char* arg, int key,
-          struct fuse_args* outargs);
+int gridfs_opt_proc(void *data, const char *arg, int key,
+                    struct fuse_args *outargs);
 
 void print_help();
 
-inline std::string db_name() { return std::string(gridfs_options.db) + "." + gridfs_options.prefix; }
+inline std::string db_name() {
+  return std::string(gridfs_options.db) + "." + gridfs_options.prefix;
+}
 
 #endif

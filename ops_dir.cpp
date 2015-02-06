@@ -25,7 +25,7 @@
 #include "options.h"
 #include "utils.h"
 
-int gridfs_mkdir(const char* path, mode_t mode) {
+int gridfs_mkdir(const char *path, mode_t mode) {
   path = fuse_to_mongo_path(path);
 
   auto sdc = make_ScopedDbConnection();
@@ -44,22 +44,24 @@ int gridfs_mkdir(const char* path, mode_t mode) {
        << "mode" << (mode | S_IFDIR);
   {
     passwd *pw = getpwuid(context->uid);
-    if (pw)
+    if (pw) {
       file << "owner" << pw->pw_name;
+    }
   }
   {
     group *gr = getgrgid(context->gid);
-    if (gr)
+    if (gr) {
       file << "group" << gr->gr_name;
+    }
   }
 
   client.insert(db_name() + ".files",
-		file.obj());
+                file.obj());
 
   return 0;
 }
 
-int gridfs_rmdir(const char* path) {
+int gridfs_rmdir(const char *path) {
   auto sdc = make_ScopedDbConnection();
   mongo::GridFS gf = get_gridfs(sdc);
 
@@ -78,38 +80,44 @@ int gridfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t of
   auto sdc = make_ScopedDbConnection();
   mongo::BSONObj proj = BSON("filename" << 1);
   std::string path_start = path;
-  if (strlen(path) > 0)
+  if (strlen(path) > 0) {
     path_start += "/";
+  }
   std::unique_ptr<mongo::DBClientCursor> cursor = sdc->conn().query(db_name() + ".files",
-								    BSON("filename" <<
-									 BSON("$regex" << "^" + path_start)
-									 ),
-								    0, 0,
-								    &proj);
+      BSON("filename" <<
+           BSON("$regex" << "^" + path_start)
+          ),
+      0, 0,
+      &proj);
   std::string lastFN;
   while (cursor->more()) {
     std::string filename = cursor->next()["filename"].String();
     std::string rel = filename.substr(path_start.length());
-    if (rel.find("/") != std::string::npos)
+    if (rel.find("/") != std::string::npos) {
       continue;
+    }
 
-    /* If this filename matches the last filename we've seen, *do not* add it to the buffer because it's a duplicate filename */ 
-    if (lastFN != filename)
+    /* If this filename matches the last filename we've seen, *do not* add it to the buffer because it's a duplicate filename */
+    if (lastFN != filename) {
       filler(buf, rel.c_str(), NULL, 0);
+    }
 
     /* Update lastFN with our cursor's current filename */
     lastFN = filename;
     fprintf(stderr, "DEBUG: %s\n", lastFN.c_str());
   }
 
-  for (auto i : open_files)
-    if (i.first.find(path_start) == 0) {
-      std::string rel = i.first.substr(path_start.length());
-      if (rel.find("/") != std::string::npos)
-	continue;
+  auto opened = all_open();
+  for (auto i : opened) {
+    if (i.find(path_start) == 0) {
+      std::string rel = i.substr(path_start.length());
+      if (rel.find("/") != std::string::npos) {
+        continue;
+      }
 
-      filler(buf, i.first.c_str(), NULL, 0);
+      filler(buf, i.c_str(), NULL, 0);
     }
+  }
 
   return 0;
 }
