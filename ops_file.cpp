@@ -29,48 +29,52 @@
 unsigned int FH = 1;
 
 int gridfs_open(const char *path, struct fuse_file_info *fi) {
-  if ((fi->flags & O_ACCMODE) != O_RDONLY)
+  if ((fi->flags & O_ACCMODE) != O_RDONLY) {
     return -EACCES;
+  }
 
   path = fuse_to_mongo_path(path);
-  if (open_files.find(path) != open_files.end())
+
+  if (get_open(path)) {
     return 0;
+  }
 
   auto sdc = make_ScopedDbConnection();
   mongo::GridFS gf = get_gridfs(sdc);
 
   mongo::GridFile file = gf.findFile(path);
 
-  if (!file.exists())
+  if (!file.exists()) {
     return -ENOENT;
+  }
 
   return 0;
 }
 
-int gridfs_release(const char* path, struct fuse_file_info* ffi) {
+int gridfs_release(const char *path, struct fuse_file_info *ffi) {
   // fh is not set if file is opened read only
   // Would check ffi->flags for O_RDONLY instead but MacFuse doesn't
   // seem to properly pass flags into release
-  if (!ffi->fh)
+  if (!ffi->fh) {
     return 0;
+  }
 
   path = fuse_to_mongo_path(path);
-  open_files.erase(path);
-
+  remove_open(path);
   return 0;
 }
 
-int gridfs_create(const char* path, mode_t mode, struct fuse_file_info* ffi) {
+int gridfs_create(const char *path, mode_t mode, struct fuse_file_info *ffi) {
   fuse_context *context = fuse_get_context();
   path = fuse_to_mongo_path(path);
-  open_files[path] = std::make_shared<LocalGridFile>(context->uid, context->gid, mode);
+  set_open(path, context->uid, context->gid, mode);
 
   ffi->fh = FH++;
 
   return 0;
 }
 
-int gridfs_unlink(const char* path) {
+int gridfs_unlink(const char *path) {
   auto sdc = make_ScopedDbConnection();
   mongo::GridFS gf = get_gridfs(sdc);
 
@@ -82,9 +86,9 @@ int gridfs_unlink(const char* path) {
 
 int gridfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
   path = fuse_to_mongo_path(path);
-  auto file_iter = open_files.find(path);
-  if (file_iter != open_files.end()) {
-    LocalGridFile::ptr lgf = file_iter->second;
+
+  auto lgf = get_open(path);
+  if (lgf) {
     return lgf->read(buf, size, offset);
   }
 
@@ -92,8 +96,9 @@ int gridfs_read(const char *path, char *buf, size_t size, off_t offset, struct f
   mongo::GridFS gf = get_gridfs(sdc);
   mongo::GridFile file = gf.findFile(path);
 
-  if (!file.exists())
+  if (!file.exists()) {
     return -EBADF;
+  }
 
   int chunk_size = file.getChunkSize();
   int chunk_num = offset / chunk_size;
@@ -121,35 +126,36 @@ int gridfs_read(const char *path, char *buf, size_t size, off_t offset, struct f
   return len;
 }
 
-int gridfs_write(const char* path, const char* buf, size_t nbyte, off_t offset, struct fuse_file_info* ffi) {
+int gridfs_write(const char *path, const char *buf, size_t nbyte, off_t offset, struct fuse_file_info *ffi) {
   path = fuse_to_mongo_path(path);
-  if (open_files.find(path) == open_files.end())
+  auto lgf = get_open(path);
+  if (!lgf) {
     return -ENOENT;
-
-  LocalGridFile::ptr lgf = open_files[path];
-
+  }
   return lgf->write(buf, nbyte, offset);
 }
 
-int gridfs_flush(const char* path, struct fuse_file_info *ffi) {
-  if (!ffi->fh)
+int gridfs_flush(const char *path, struct fuse_file_info *ffi) {
+  if (!ffi->fh) {
     return 0;
+  }
 
   path = fuse_to_mongo_path(path);
-  auto file_iter = open_files.find(path);
-  if (file_iter == open_files.end())
+  auto lgf = get_open(path);
+  if (!lgf) {
     return -ENOENT;
+  }
 
-  LocalGridFile::ptr lgf = file_iter->second;
-
-  if (lgf->is_clean())
+  if (lgf->is_clean()) {
     return 0;
+  }
 
   auto sdc = make_ScopedDbConnection();
   mongo::GridFS gf = get_gridfs(sdc);
 
-  if (gf.findFile(path).exists())
+  if (gf.findFile(path).exists()) {
     gf.removeFile(path);
+  }
 
   size_t len = lgf->Length();
   char *buf = new char[len];
@@ -160,19 +166,21 @@ int gridfs_flush(const char* path, struct fuse_file_info *ffi) {
   mongo::BSONObjBuilder b;
   {
     passwd *pw = getpwuid(lgf->Uid());
-    if (pw)
+    if (pw) {
       b.append("owner", pw->pw_name);
+    }
   }
   {
     group *gr = getgrgid(lgf->Gid());
-    if (gr)
+    if (gr) {
       b.append("group", gr->gr_name);
+    }
   }
   b.append("mode", lgf->Mode());
 
   sdc->conn().update(db_name() + ".files",
-		     BSON("filename" << path),
-		     BSON("$set" << b.obj()));
+                     BSON("filename" << path),
+                     BSON("$set" << b.obj()));
 
   lgf->set_flushed();
 

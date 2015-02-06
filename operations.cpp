@@ -24,12 +24,13 @@
 #include <mongo/client/dbclient.h>
 #include <mongo/util/net/hostandport.h>
 
+std::mutex g_mutex;
 std::map<std::string, LocalGridFile::ptr> open_files;
 
 //! Automatically call ScopedDbConnection::done() when a shared_ptr of one is
 //  about to be deleted (presumebly because it is passing out of scope).
 struct SDC_deleter {
-  void operator()(mongo::ScopedDbConnection* sdc) {
+  void operator()(mongo::ScopedDbConnection *sdc) {
     sdc->done();
   }
 };
@@ -44,4 +45,33 @@ std::shared_ptr<mongo::ScopedDbConnection> make_ScopedDbConnection(void) {
   }
 
   return std::shared_ptr<mongo::ScopedDbConnection>(sdc, SDC_deleter());
+}
+
+LocalGridFile::ptr
+get_open(const char *path) {
+  std::lock_guard<std::mutex> guard(g_mutex);
+  auto it = open_files.find(path);
+  return it == open_files.end() ? nullptr : it->second;
+}
+
+LocalGridFile::ptr
+set_open(const char *path, uid_t u, gid_t g, mode_t m, int chunkSize) {
+  std::lock_guard<std::mutex> guard(g_mutex);
+  return open_files[path] = std::make_shared<LocalGridFile>(u, g, m, chunkSize);
+}
+
+void
+remove_open(const char *path) {
+  std::lock_guard<std::mutex> guard(g_mutex);
+  open_files.erase(path);
+}
+
+std::vector<std::string>
+all_open() {
+  std::lock_guard<std::mutex> guard(g_mutex);
+  std::vector<std::string> files(open_files.size());
+  for (auto i : open_files) {
+    files.push_back(i.first);
+  }
+  return files;
 }

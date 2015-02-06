@@ -25,36 +25,65 @@ public:
     _chunks.push_back(new char[_chunkSize]);
   }
 
+  LocalGridFile(const LocalGridFile &other) = delete;
+  LocalGridFile &operator=(const LocalGridFile &other) = delete;
+
   ~LocalGridFile() {
     for (auto i : _chunks) {
       delete i;
     }
   }
 
-  int Length() const { return _length; }
+  int Length() const {
+    return _length;
+  }
 
-  int ChunkSize() const { return _chunkSize; }
+  int ChunkSize() const {
+    return _chunkSize;
+  }
 
-  int NumChunks() const { return _chunks.size(); }
+  int NumChunks() const {
+    return _chunks.size();
+  }
 
-  char* Chunk(int n) const { return _chunks[n]; }
+  char *Chunk(int n) const {
+    return _chunks[n];
+  }
 
-  uid_t Uid() const { return _uid; }
-  void setUid(uid_t u) { _uid = u; }
+  uid_t Uid() const {
+    return _uid;
+  }
+  void setUid(uid_t u) {
+    _uid = u;
+  }
 
-  gid_t Gid() const { return _gid; }
-  void setGid(gid_t g) { _gid = g; }
+  gid_t Gid() const {
+    return _gid;
+  }
+  void setGid(gid_t g) {
+    _gid = g;
+  }
 
-  mode_t Mode() const { return _mode; }
-  void setMode(mode_t m) { _mode = m; }
+  mode_t Mode() const {
+    return _mode;
+  }
+  void setMode(mode_t m) {
+    _mode = m;
+  }
 
-  bool is_dirty() const { return _dirty; }
-  bool is_clean() const { return !_dirty; }
+  bool is_dirty() const {
+    return _dirty;
+  }
+  bool is_clean() const {
+    return !_dirty;
+  }
 
-  void set_flushed() { _dirty = false; }
+  void set_flushed() {
+    _dirty = false;
+  }
 
-  int write(const char* buf, size_t nbyte, off_t offset);
-  int read(char* buf, size_t size, off_t offset);
+  int write(const char *buf, size_t nbyte, off_t offset);
+  int read(char *buf, size_t size, off_t offset);
 
   typedef std::shared_ptr<LocalGridFile> ptr;
 
@@ -65,7 +94,7 @@ private:
   mode_t _mode;
 
   bool _dirty;
-  std::vector<char*> _chunks;
+  std::vector<char *> _chunks;
 };
 
 #endif

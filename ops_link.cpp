@@ -22,28 +22,31 @@
 #include "operations.h"
 #include "utils.h"
 
-int gridfs_readlink(const char* path, char* buf, size_t size) {
+int gridfs_readlink(const char *path, char *buf, size_t size) {
   path = fuse_to_mongo_path(path);
 
   auto sdc = make_ScopedDbConnection();
   mongo::BSONObj file_obj = sdc->conn().findOne(db_name() + ".files",
-						BSON("filename" << path));
+                            BSON("filename" << path));
 
-  if (file_obj.isEmpty())
+  if (file_obj.isEmpty()) {
     return -ENOENT;
+  }
 
-  if (!file_obj.hasField("target"))
+  if (!file_obj.hasField("target")) {
     return -ENOENT;
+  }
 
   std::string target = file_obj["target"].String();
   strncpy(buf, target.c_str(), size);
-  if (target.length() >= size)
+  if (target.length() >= size) {
     buf[size] = 0;
+  }
 
   return 0;
 }
 
-int gridfs_symlink(const char* target, const char* path) {
+int gridfs_symlink(const char *target, const char *path) {
   path = fuse_to_mongo_path(path);
 
   mongo::OID id;
@@ -60,18 +63,19 @@ int gridfs_symlink(const char* target, const char* path) {
        << "target" << target;
   {
     passwd *pw = getpwuid(context->uid);
-    if (pw)
+    if (pw) {
       file << "owner" << pw->pw_name;
+    }
   }
   {
     group *gr = getgrgid(context->gid);
-    if (gr)
+    if (gr) {
       file << "group" << gr->gr_name;
+    }
   }
 
   auto sdc = make_ScopedDbConnection();
-  sdc->conn().insert(db_name() + ".files",
-		     file.obj());
+  sdc->conn().insert(db_name() + ".files", file.obj());
 
   return 0;
 }

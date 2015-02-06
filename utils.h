@@ -22,26 +22,33 @@
 #include <string>
 #include <cstring>
 
-inline const char* fuse_to_mongo_path(const char* path) {
-  if (path[0] == '/')
+inline const char *fuse_to_mongo_path(const char *path) {
+  if (path[0] == '/') {
     return path + 1;
+  }
   return path;
 }
 
-inline const bool is_leaf(const char* path) {
+inline const bool is_leaf(const char *path) {
   int pp = -1;
   int sp = -1;
   for (size_t i = 0; i < strlen(path); i++) {
-    if (path[i] == '/') sp = i;
-    if (path[i] == '.') pp = i;
+    if (path[i] == '/') {
+      sp = i;
+    }
+    if (path[i] == '.') {
+      pp = i;
+    }
   }
   return pp > sp;
 }
 
-inline const int path_depth(const char* path) {
+inline const int path_depth(const char *path) {
   int sc = 0;
-  for (size_t i=0; i < strlen(path); i++) {
-    if (path[i] == '/') sc++;
+  for (size_t i = 0; i < strlen(path); i++) {
+    if (path[i] == '/') {
+      sc++;
+    }
   }
   return sc;
 }
@@ -66,9 +73,9 @@ inline std::string namespace_xattr(const std::string name) {
 #endif
 }
 
-inline const char* unnamespace_xattr(const char* name) {
+inline const char *unnamespace_xattr(const char *name) {
 #ifdef __linux__
-  if(std::strstr(name, "user.") == name) {
+  if (std::strstr(name, "user.") == name) {
     return name + 5;
   } else {
     return NULL;

@@ -36,7 +36,7 @@ struct fuse_opt gridfs_opts[] = {
   NULL
 };
 
-int gridfs_opt_proc(void* data, const char* arg, int key, struct fuse_args* outargs) {
+int gridfs_opt_proc(void *data, const char *arg, int key, struct fuse_args *outargs) {
   if (key == KEY_HELP) {
     print_help();
     return -1;
